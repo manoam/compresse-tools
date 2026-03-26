@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 import AppLayout from './components/layout/AppLayout';
 import Home from './pages/Home';
 import CompressPdf from './pages/CompressPdf';
@@ -10,10 +11,14 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route element={<AppLayout />}>
-            <Route path="/" element={<Home />} />
-            <Route path="/compress-pdf" element={<CompressPdf />} />
-            <Route path="/compress-image" element={<CompressImage />} />
+          <Route path="/" element={
+            <ProtectedRoute>
+              <AppLayout />
+            </ProtectedRoute>
+          }>
+            <Route index element={<Home />} />
+            <Route path="compress-pdf" element={<CompressPdf />} />
+            <Route path="compress-image" element={<CompressImage />} />
           </Route>
         </Routes>
       </BrowserRouter>

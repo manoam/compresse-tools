@@ -1,30 +1,37 @@
-import { Outlet } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useState, useEffect } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
+import Sidebar from './Sidebar';
+import Header from './Header';
+
+const pageTitles: Record<string, string> = {
+  '/': 'Accueil',
+  '/compress-pdf': 'Compresser PDF',
+  '/compress-image': 'Compresser Image',
+};
 
 export default function AppLayout() {
-  const { user, logout } = useAuth();
+  const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const title = pageTitles[location.pathname] || 'CompressTool';
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      {/* Simple header until Module Federation is fixed */}
-      <header className="h-12 shrink-0 border-b border-gray-200 bg-white flex items-center justify-between px-4">
-        <span className="font-semibold text-gray-800">CompressTool</span>
-        {user && (
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-600">{user.firstName} {user.lastName}</span>
-            <button
-              onClick={logout}
-              className="text-sm text-red-600 hover:text-red-800"
-            >
-              Déconnexion
-            </button>
-          </div>
-        )}
-      </header>
+    <div className="flex h-screen bg-gray-50">
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-      <main className="flex-1 min-w-0 overflow-y-auto p-3 md:p-5">
-        <Outlet />
-      </main>
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <Header title={title} onMenuClick={() => setSidebarOpen(true)} />
+
+        <main className="flex-1 overflow-auto bg-gray-50 p-4 md:p-6">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

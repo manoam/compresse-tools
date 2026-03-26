@@ -48,7 +48,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch((err) => {
         console.error('Keycloak init failed', err);
-        setLoading(false);
+        // Retry login instead of showing app unauthenticated
+        window.location.reload();
       });
 
     // Auto-refresh token
@@ -69,6 +70,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50">
         <div className="text-gray-500">Connexion en cours...</div>
+      </div>
+    );
+  }
+
+  if (!authenticated) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-gray-500">Redirection vers la connexion...</div>
       </div>
     );
   }

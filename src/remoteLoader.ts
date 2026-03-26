@@ -10,6 +10,10 @@ interface RemoteContainer {
   get: (module: string) => Promise<() => any>;
 }
 
+/**
+ * Register host React/ReactDOM into the federation shared scope
+ * so remote components reuse our single instance instead of loading their own.
+ */
 function ensureSharedScope() {
   const g = globalThis as any;
   g.__federation_shared__ = g.__federation_shared__ || {};
@@ -17,26 +21,23 @@ function ensureSharedScope() {
 
   const shared = g.__federation_shared__['default'];
 
-  const reactEntry = {
-    get: () => () => React,
-    loaded: true,
-    scope: 'default',
-  };
-  const reactDomEntry = {
-    get: () => () => ReactDOM,
-    loaded: true,
-    scope: 'default',
-  };
+  if (!shared['react']) {
+    shared['react'] = {
+      '18.3.1': {
+        get: () => () => React,
+        scope: 'default',
+      },
+    };
+  }
 
-  if (!shared['react']) shared['react'] = {};
-  shared['react'][React.version] = reactEntry;
-  shared['react']['18.3.1'] = reactEntry;
-  shared['react']['18.0.0'] = reactEntry;
-
-  if (!shared['react-dom']) shared['react-dom'] = {};
-  shared['react-dom'][React.version] = reactDomEntry;
-  shared['react-dom']['18.3.1'] = reactDomEntry;
-  shared['react-dom']['18.0.0'] = reactDomEntry;
+  if (!shared['react-dom']) {
+    shared['react-dom'] = {
+      '18.3.1': {
+        get: () => () => ReactDOM,
+        scope: 'default',
+      },
+    };
+  }
 }
 
 let containerPromise: Promise<RemoteContainer> | null = null;
@@ -48,8 +49,7 @@ function loadRemoteEntry(): Promise<RemoteContainer> {
 
   containerPromise = import(/* @vite-ignore */ `${PLATEFORM_URL}/assets/remoteEntry.js`)
     .then((container: RemoteContainer) => {
-      const g = globalThis as any;
-      container.init(g.__federation_shared__?.['default'] || {});
+      container.init({});
       return container;
     })
     .catch((err) => {
@@ -65,6 +65,7 @@ export async function loadRemoteComponent(moduleName: string): Promise<{ default
   const factory = await container.get(moduleName);
   const result = factory();
 
+  // React.lazy expects { default: Component }
   if (result && typeof result === 'object' && 'default' in result) {
     return result;
   }

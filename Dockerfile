@@ -33,4 +33,5 @@ RUN mkdir -p /app/server/uploads
 
 EXPOSE 3001
 
-CMD ["python", "server/main.py"]
+WORKDIR /app/server
+CMD ["python", "main.py"]

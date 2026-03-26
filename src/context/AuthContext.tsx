@@ -45,11 +45,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const initKeycloak = async () => {
       try {
-        // PKCE S256 requires Web Crypto API (HTTPS only)
-        const usesPkce = window.isSecureContext;
         const authenticated = await keycloak.init({
           onLoad: 'login-required',
-          ...(usesPkce ? { pkceMethod: 'S256' as const } : {}),
           checkLoginIframe: false,
         });
 

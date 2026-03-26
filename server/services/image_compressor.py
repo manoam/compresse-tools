@@ -1,5 +1,18 @@
 from io import BytesIO
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageCms
+
+
+def _convert_to_srgb(img: Image.Image) -> Image.Image:
+    """Convert image from any ICC profile to sRGB to preserve colors."""
+    try:
+        icc_profile = img.info.get("icc_profile")
+        if icc_profile:
+            input_profile = ImageCms.ImageCmsProfile(BytesIO(icc_profile))
+            srgb_profile = ImageCms.createProfile("sRGB")
+            img = ImageCms.profileToProfile(img, input_profile, srgb_profile)
+    except Exception:
+        pass
+    return img
 
 
 def compress_image(input_bytes: bytes, quality: int = 70, output_format: str | None = None) -> dict:
@@ -11,6 +24,9 @@ def compress_image(input_bytes: bytes, quality: int = 70, output_format: str | N
     # Auto-rotate based on EXIF
     img = ImageOps.exif_transpose(img)
 
+    # Convert to sRGB to preserve colors when stripping ICC profile
+    img = _convert_to_srgb(img)
+
     # Determine output format
     fmt = output_format or img.format or "JPEG"
     fmt = fmt.upper()
@@ -20,11 +36,15 @@ def compress_image(input_bytes: bytes, quality: int = 70, output_format: str | N
     # Convert RGBA to RGB for JPEG
     if fmt == "JPEG" and img.mode in ("RGBA", "P"):
         img = img.convert("RGB")
+    elif fmt == "JPEG" and img.mode == "CMYK":
+        img = img.convert("RGB")
 
     output = BytesIO()
 
+    # Build sRGB ICC profile to embed
+    srgb_icc = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
+
     if fmt == "JPEG":
-        # Smart subsampling: keep 4:4:4 at high quality for sharpness
         subsampling = "4:4:4" if quality >= 90 else "4:2:0"
         img.save(
             output,
@@ -32,28 +52,21 @@ def compress_image(input_bytes: bytes, quality: int = 70, output_format: str | N
             quality=quality,
             optimize=True,
             subsampling=subsampling,
-            # Strip all metadata (EXIF, ICC, etc.) for smaller size
+            icc_profile=srgb_icc,
         )
     elif fmt == "PNG":
-        # For PNG: strip metadata, max compression level
-        # Convert to palette mode if possible (huge savings)
         if img.mode == "RGBA":
-            # Keep RGBA, just optimize compression
-            img.save(output, format="PNG", optimize=True, compress_level=9)
+            img.save(output, format="PNG", optimize=True, compress_level=9, icc_profile=srgb_icc)
         else:
             img = img.convert("RGB")
-            # Try to quantize to palette for smaller size
-            try:
-                quantized = img.quantize(colors=256, method=2)
-                quantized.save(output, format="PNG", optimize=True, compress_level=9)
-            except Exception:
-                img.save(output, format="PNG", optimize=True, compress_level=9)
+            img.save(output, format="PNG", optimize=True, compress_level=9, icc_profile=srgb_icc)
     elif fmt == "WEBP":
         img.save(
             output,
             format="WEBP",
             quality=quality,
-            method=6,  # slowest but best compression
+            method=6,
+            icc_profile=srgb_icc,
         )
     else:
         img.save(output, format=fmt, quality=quality)

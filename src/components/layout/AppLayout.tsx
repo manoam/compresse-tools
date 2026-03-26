@@ -1,6 +1,7 @@
 import React, { Suspense, useState, useEffect, Component } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { loadRemoteComponent } from '../../remoteLoader';
+import { useAuth } from '../../context/AuthContext';
 
 const RemoteHeaderBar = React.lazy(() => loadRemoteComponent('./HeaderBar'));
 const RemoteSidebar = React.lazy(() => loadRemoteComponent('./Sidebar'));
@@ -55,8 +56,9 @@ export default function AppLayout() {
 
   const handleNavigate = (path: string) => navigate(path);
 
-  const headerUser = null;
-  const handleLogout = () => {};
+  const { user, logout } = useAuth();
+  const headerUser = user;
+  const handleLogout = logout;
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">

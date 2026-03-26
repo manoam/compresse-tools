@@ -1,0 +1,9 @@
+node_modules
+dist
+server/venv
+server/__pycache__
+server/routes/__pycache__
+server/services/__pycache__
+server/uploads/*
+.git
+*.bat

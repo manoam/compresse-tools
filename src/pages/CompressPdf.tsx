@@ -6,7 +6,7 @@ import { useCompression } from '../hooks/useCompression';
 import { compressPdf } from '../lib/api';
 
 export default function CompressPdf() {
-  const [quality, setQuality] = useState(60);
+  const [quality] = useState(90);
   const { file, setFile, compressing, result, error, compress, download, reset } =
     useCompression({ compressFn: compressPdf });
 
@@ -43,27 +43,6 @@ export default function CompressPdf() {
       {file && !result && (
         <div className="space-y-5">
           <FilePreview file={file} onRemove={reset} />
-
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Qualite des images : {quality}%
-            </label>
-            <input
-              type="range"
-              min="10"
-              max="100"
-              value={quality}
-              onChange={(e) => setQuality(Number(e.target.value))}
-              className="w-full accent-primary-600"
-            />
-            <div className="flex justify-between text-xs text-gray-400 mt-1">
-              <span>Plus compresse</span>
-              <span>Meilleure qualite</span>
-            </div>
-            <p className="text-xs text-gray-400 mt-2">
-              La compression PDF fonctionne en recompressant les images internes du document.
-            </p>
-          </div>
 
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-red-700 text-sm">

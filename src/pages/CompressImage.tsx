@@ -6,7 +6,7 @@ import { useCompression } from '../hooks/useCompression';
 import { compressImage } from '../lib/api';
 
 export default function CompressImage() {
-  const [quality, setQuality] = useState(70);
+  const [quality] = useState(90);
   const { file, setFile, compressing, result, error, compress, download, reset } =
     useCompression({ compressFn: compressImage });
 
@@ -43,24 +43,6 @@ export default function CompressImage() {
       {file && !result && (
         <div className="space-y-5">
           <FilePreview file={file} onRemove={reset} />
-
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Qualite : {quality}%
-            </label>
-            <input
-              type="range"
-              min="10"
-              max="100"
-              value={quality}
-              onChange={(e) => setQuality(Number(e.target.value))}
-              className="w-full accent-primary-600"
-            />
-            <div className="flex justify-between text-xs text-gray-400 mt-1">
-              <span>Plus compresse</span>
-              <span>Meilleure qualite</span>
-            </div>
-          </div>
 
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-red-700 text-sm">

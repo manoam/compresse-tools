@@ -23,14 +23,15 @@ RUN apt-get update && \
         nasm \
         build-essential \
         libpng-dev && \
-    # Build mozjpeg v4.1.1 statically linked
+    # Build and install mozjpeg v4.1.1 (libs + binaries)
     wget -q https://github.com/mozilla/mozjpeg/archive/refs/tags/v4.1.1.tar.gz -O /tmp/mozjpeg.tar.gz && \
     tar xzf /tmp/mozjpeg.tar.gz -C /tmp && \
     cd /tmp/mozjpeg-4.1.1 && \
     mkdir build && cd build && \
-    cmake -G"Unix Makefiles" -DENABLE_STATIC=TRUE -DENABLE_SHARED=FALSE -DCMAKE_EXE_LINKER_FLAGS="-static" .. && \
+    cmake -G"Unix Makefiles" -DCMAKE_INSTALL_PREFIX=/opt/mozjpeg .. && \
     make -j$(nproc) && \
-    cp cjpeg-static /usr/local/bin/cjpeg || cp cjpeg /usr/local/bin/cjpeg && \
+    make install && \
+    ln -s /opt/mozjpeg/bin/cjpeg /usr/local/bin/cjpeg && \
     rm -rf /tmp/mozjpeg* && \
     # Install oxipng v9.1.3
     wget -q https://github.com/shssoichiro/oxipng/releases/download/v9.1.3/oxipng-9.1.3-x86_64-unknown-linux-musl.tar.gz -O /tmp/oxipng.tar.gz && \
@@ -56,6 +57,8 @@ COPY --from=frontend-build /app/dist /app/static
 
 # Create uploads dir
 RUN mkdir -p /app/server/uploads
+
+ENV LD_LIBRARY_PATH=/opt/mozjpeg/lib64:/opt/mozjpeg/lib:$LD_LIBRARY_PATH
 
 EXPOSE 3001
 

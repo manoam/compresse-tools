@@ -23,16 +23,16 @@ RUN apt-get update && \
         nasm \
         build-essential \
         libpng-dev && \
-    # Build mozjpeg from source
-    wget -q https://github.com/nicehash/mozjpeg/archive/refs/tags/v4.1.5.tar.gz -O /tmp/mozjpeg.tar.gz && \
+    # Build mozjpeg v4.1.1 from official Mozilla source
+    wget -q https://github.com/mozilla/mozjpeg/archive/refs/tags/v4.1.1.tar.gz -O /tmp/mozjpeg.tar.gz && \
     tar xzf /tmp/mozjpeg.tar.gz -C /tmp && \
-    cd /tmp/mozjpeg-4.1.5 && \
+    cd /tmp/mozjpeg-4.1.1 && \
     mkdir build && cd build && \
     cmake -G"Unix Makefiles" -DCMAKE_INSTALL_PREFIX=/usr/local .. && \
     make -j$(nproc) && \
     cp cjpeg /usr/local/bin/cjpeg && \
     rm -rf /tmp/mozjpeg* && \
-    # Install oxipng
+    # Install oxipng v9.1.3
     wget -q https://github.com/shssoichiro/oxipng/releases/download/v9.1.3/oxipng-9.1.3-x86_64-unknown-linux-musl.tar.gz -O /tmp/oxipng.tar.gz && \
     tar xzf /tmp/oxipng.tar.gz -C /tmp && \
     mv /tmp/oxipng-9.1.3-x86_64-unknown-linux-musl/oxipng /usr/local/bin/oxipng && \

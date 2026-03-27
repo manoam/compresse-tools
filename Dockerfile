@@ -23,14 +23,14 @@ RUN apt-get update && \
         nasm \
         build-essential \
         libpng-dev && \
-    # Build mozjpeg v4.1.1 from official Mozilla source
+    # Build mozjpeg v4.1.1 statically linked
     wget -q https://github.com/mozilla/mozjpeg/archive/refs/tags/v4.1.1.tar.gz -O /tmp/mozjpeg.tar.gz && \
     tar xzf /tmp/mozjpeg.tar.gz -C /tmp && \
     cd /tmp/mozjpeg-4.1.1 && \
     mkdir build && cd build && \
-    cmake -G"Unix Makefiles" -DCMAKE_INSTALL_PREFIX=/usr/local .. && \
+    cmake -G"Unix Makefiles" -DENABLE_STATIC=TRUE -DENABLE_SHARED=FALSE -DCMAKE_EXE_LINKER_FLAGS="-static" .. && \
     make -j$(nproc) && \
-    cp cjpeg /usr/local/bin/cjpeg && \
+    cp cjpeg-static /usr/local/bin/cjpeg || cp cjpeg /usr/local/bin/cjpeg && \
     rm -rf /tmp/mozjpeg* && \
     # Install oxipng v9.1.3
     wget -q https://github.com/shssoichiro/oxipng/releases/download/v9.1.3/oxipng-9.1.3-x86_64-unknown-linux-musl.tar.gz -O /tmp/oxipng.tar.gz && \

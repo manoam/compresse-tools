@@ -13,7 +13,7 @@ RUN npm run build
 FROM python:3.12-slim
 WORKDIR /app
 
-# Install Ghostscript + mozjpeg + pngquant + oxipng
+# Install Ghostscript + pngquant + build mozjpeg + oxipng
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ghostscript \
@@ -23,9 +23,15 @@ RUN apt-get update && \
         nasm \
         build-essential \
         libpng-dev && \
-    # Install mozjpeg
-    wget -q https://github.com/nicehash/cjpeg-mozjpeg/releases/download/v4.1.5/cjpeg-static-x86_64 -O /usr/local/bin/cjpeg && \
-    chmod +x /usr/local/bin/cjpeg && \
+    # Build mozjpeg from source
+    wget -q https://github.com/nicehash/mozjpeg/archive/refs/tags/v4.1.5.tar.gz -O /tmp/mozjpeg.tar.gz && \
+    tar xzf /tmp/mozjpeg.tar.gz -C /tmp && \
+    cd /tmp/mozjpeg-4.1.5 && \
+    mkdir build && cd build && \
+    cmake -G"Unix Makefiles" -DCMAKE_INSTALL_PREFIX=/usr/local .. && \
+    make -j$(nproc) && \
+    cp cjpeg /usr/local/bin/cjpeg && \
+    rm -rf /tmp/mozjpeg* && \
     # Install oxipng
     wget -q https://github.com/shssoichiro/oxipng/releases/download/v9.1.3/oxipng-9.1.3-x86_64-unknown-linux-musl.tar.gz -O /tmp/oxipng.tar.gz && \
     tar xzf /tmp/oxipng.tar.gz -C /tmp && \

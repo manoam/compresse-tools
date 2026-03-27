@@ -83,8 +83,25 @@ export async function compressPdf(
   return { blob, originalSize, compressedSize, filename };
 }
 
-export async function fetchHistory(token: string): Promise<HistoryRecord[]> {
-  const res = await fetch('/api/history/', {
+export interface HistoryResponse {
+  data: HistoryRecord[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
+export async function fetchHistory(
+  token: string,
+  params: { page?: number; per_page?: number; type?: string; search?: string } = {}
+): Promise<HistoryResponse> {
+  const query = new URLSearchParams();
+  if (params.page) query.set('page', params.page.toString());
+  if (params.per_page) query.set('per_page', params.per_page.toString());
+  if (params.type) query.set('type', params.type);
+  if (params.search) query.set('search', params.search);
+
+  const res = await fetch(`/api/history/?${query.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error('Failed to load history');

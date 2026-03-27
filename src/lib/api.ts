@@ -11,7 +11,14 @@ export interface HistoryRecord {
   original_size: number;
   compressed_size: number;
   compression_type: string;
+  username: string;
+  user_id: string;
   created_at: string;
+}
+
+export interface HistoryUser {
+  user_id: string;
+  username: string;
 }
 
 export async function compressImage(
@@ -89,21 +96,31 @@ export interface HistoryResponse {
   page: number;
   per_page: number;
   total_pages: number;
+  is_admin: boolean;
 }
 
 export async function fetchHistory(
   token: string,
-  params: { page?: number; per_page?: number; type?: string; search?: string } = {}
+  params: { page?: number; per_page?: number; type?: string; search?: string; user_id?: string } = {}
 ): Promise<HistoryResponse> {
   const query = new URLSearchParams();
   if (params.page) query.set('page', params.page.toString());
   if (params.per_page) query.set('per_page', params.per_page.toString());
   if (params.type) query.set('type', params.type);
   if (params.search) query.set('search', params.search);
+  if (params.user_id) query.set('user_id', params.user_id);
 
   const res = await fetch(`/api/history/?${query.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error('Failed to load history');
+  return res.json();
+}
+
+export async function fetchHistoryUsers(token: string): Promise<HistoryUser[]> {
+  const res = await fetch('/api/history/users', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return [];
   return res.json();
 }

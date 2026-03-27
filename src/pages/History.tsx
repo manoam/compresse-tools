@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { fetchHistory, type HistoryRecord, type HistoryResponse } from '../lib/api';
-import { Search, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { fetchHistory, fetchHistoryUsers, type HistoryRecord, type HistoryResponse, type HistoryUser } from '../lib/api';
+import { Search, ChevronLeft, ChevronRight, Filter, Users } from 'lucide-react';
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -25,6 +25,7 @@ export default function History() {
   const [records, setRecords] = useState<HistoryRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -32,8 +33,17 @@ export default function History() {
   const perPage = 20;
 
   const [typeFilter, setTypeFilter] = useState<string>('');
+  const [userFilter, setUserFilter] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchInput, setSearchInput] = useState('');
+
+  const [users, setUsers] = useState<HistoryUser[]>([]);
+
+  // Load users list (admin only)
+  useEffect(() => {
+    if (!token) return;
+    fetchHistoryUsers(token).then(setUsers);
+  }, [token]);
 
   const loadHistory = useCallback(async () => {
     if (!token) return;
@@ -45,16 +55,18 @@ export default function History() {
         per_page: perPage,
         type: typeFilter || undefined,
         search: searchQuery || undefined,
+        user_id: userFilter || undefined,
       });
       setRecords(res.data);
       setTotalPages(res.total_pages);
       setTotal(res.total);
+      setIsAdmin(res.is_admin);
     } catch (e: any) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [token, page, typeFilter, searchQuery]);
+  }, [token, page, typeFilter, searchQuery, userFilter]);
 
   useEffect(() => {
     loadHistory();
@@ -63,7 +75,7 @@ export default function History() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1);
-  }, [typeFilter, searchQuery]);
+  }, [typeFilter, searchQuery, userFilter]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,7 +103,7 @@ export default function History() {
         </form>
 
         <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-gray-400" />
+          <Filter className="h-4 w-4 text-gray-400 shrink-0" />
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
@@ -101,6 +113,24 @@ export default function History() {
             <option value="pdf">PDF</option>
             <option value="image">Image</option>
           </select>
+
+          {isAdmin && users.length > 0 && (
+            <>
+              <Users className="h-4 w-4 text-gray-400 shrink-0" />
+              <select
+                value={userFilter}
+                onChange={(e) => setUserFilter(e.target.value)}
+                className="py-2 px-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+              >
+                <option value="">Tous les utilisateurs</option>
+                {users.map((u) => (
+                  <option key={u.user_id} value={u.user_id}>
+                    {u.username}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
         </div>
       </div>
 
@@ -116,7 +146,7 @@ export default function History() {
 
       {!loading && !error && records.length === 0 && (
         <div className="text-center py-12 text-gray-400">
-          {searchQuery || typeFilter ? 'Aucun resultat pour ces filtres.' : 'Aucune compression pour le moment.'}
+          {searchQuery || typeFilter || userFilter ? 'Aucun resultat pour ces filtres.' : 'Aucune compression pour le moment.'}
         </div>
       )}
 
@@ -129,6 +159,7 @@ export default function History() {
                   <tr className="bg-gray-50 border-b border-gray-200">
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Fichier</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Type</th>
+                    {isAdmin && <th className="text-left px-4 py-3 font-medium text-gray-600">Utilisateur</th>}
                     <th className="text-right px-4 py-3 font-medium text-gray-600">Original</th>
                     <th className="text-right px-4 py-3 font-medium text-gray-600">Compresse</th>
                     <th className="text-right px-4 py-3 font-medium text-gray-600">Reduction</th>
@@ -154,6 +185,9 @@ export default function History() {
                             {r.compression_type.toUpperCase()}
                           </span>
                         </td>
+                        {isAdmin && (
+                          <td className="px-4 py-3 text-gray-600">{r.username}</td>
+                        )}
                         <td className="px-4 py-3 text-right text-gray-600">{formatSize(r.original_size)}</td>
                         <td className="px-4 py-3 text-right text-gray-600">{formatSize(r.compressed_size)}</td>
                         <td className="px-4 py-3 text-right">

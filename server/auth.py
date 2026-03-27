@@ -50,10 +50,17 @@ async def get_current_user(request: Request) -> dict:
             issuer=issuer,
             options={"verify_aud": False},
         )
+        roles = []
+        realm_access = payload.get("realm_access", {})
+        if isinstance(realm_access, dict):
+            roles = realm_access.get("roles", [])
+
         return {
             "user_id": payload.get("sub"),
             "username": payload.get("preferred_username", ""),
             "email": payload.get("email", ""),
+            "roles": roles,
+            "is_admin": "admin" in roles,
         }
     except JWTError as e:
         raise HTTPException(status_code=401, detail=f"Token validation failed: {str(e)}")

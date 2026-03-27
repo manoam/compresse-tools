@@ -1,6 +1,6 @@
 import React, { Component, Suspense, useState, useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Home, FileDown, Image, Shrink } from 'lucide-react'
+import { Home, FileDown, Image, Shrink, Clock } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { loadRemoteComponent } from '../../remoteLoader'
 
@@ -16,6 +16,7 @@ const SIDEBAR_SECTIONS = [
       { icon: Home, label: 'Accueil', path: '/' },
       { icon: FileDown, label: 'Compresser PDF', path: '/compress-pdf' },
       { icon: Image, label: 'Compresser Image', path: '/compress-image' },
+      { icon: Clock, label: 'Historique', path: '/history' },
     ],
   },
 ]

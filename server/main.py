@@ -1,5 +1,6 @@
 import sys
 import os
+from contextlib import asynccontextmanager
 
 # Ensure server/ is in sys.path when run from project root
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -8,10 +9,19 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from database import init_db
 from routes.compress_image import router as image_router
 from routes.compress_pdf import router as pdf_router
+from routes.history import router as history_router
 
-app = FastAPI(title="CompressTool API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    yield
+
+
+app = FastAPI(title="CompressTool API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,6 +33,7 @@ app.add_middleware(
 
 app.include_router(image_router, prefix="/api/compress/image")
 app.include_router(pdf_router, prefix="/api/compress/pdf")
+app.include_router(history_router, prefix="/api/history")
 
 
 @app.get("/api/health")

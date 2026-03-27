@@ -5,6 +5,7 @@ import AppLayout from './components/layout/AppLayout';
 import Home from './pages/Home';
 import CompressPdf from './pages/CompressPdf';
 import CompressImage from './pages/CompressImage';
+import History from './pages/History';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
             <Route index element={<Home />} />
             <Route path="compress-pdf" element={<CompressPdf />} />
             <Route path="compress-image" element={<CompressImage />} />
+            <Route path="history" element={<History />} />
           </Route>
         </Routes>
       </BrowserRouter>

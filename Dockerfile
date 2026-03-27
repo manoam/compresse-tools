@@ -13,7 +13,7 @@ RUN npm run build
 FROM python:3.12-slim
 WORKDIR /app
 
-# Install Ghostscript
+# Install Ghostscript + build deps for asyncpg
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ghostscript && \
     apt-get clean && \

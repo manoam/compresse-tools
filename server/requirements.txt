@@ -2,3 +2,7 @@ fastapi
 uvicorn
 python-multipart
 Pillow
+sqlalchemy[asyncio]
+asyncpg
+python-jose[cryptography]
+httpx

@@ -4,11 +4,13 @@ import FilePreview from '../components/FilePreview';
 import CompressionResult from '../components/CompressionResult';
 import { useCompression } from '../hooks/useCompression';
 import { compressImage } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 
 export default function CompressImage() {
+  const { token } = useAuth();
   const [quality] = useState(90);
   const { file, setFile, compressing, result, error, compress, download, reset } =
-    useCompression({ compressFn: compressImage });
+    useCompression({ compressFn: compressImage, token });
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-12">

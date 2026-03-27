@@ -5,19 +5,33 @@ export interface CompressionResult {
   filename: string;
 }
 
+export interface HistoryRecord {
+  id: number;
+  filename: string;
+  original_size: number;
+  compressed_size: number;
+  compression_type: string;
+  created_at: string;
+}
+
 export async function compressImage(
   file: File,
   quality: number,
-  format?: string
+  format?: string,
+  token?: string | null
 ): Promise<CompressionResult> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('quality', quality.toString());
   if (format) formData.append('format', format);
 
+  const headers: HeadersInit = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const res = await fetch('/api/compress/image/', {
     method: 'POST',
     body: formData,
+    headers,
   });
 
   if (!res.ok) {
@@ -37,15 +51,21 @@ export async function compressImage(
 
 export async function compressPdf(
   file: File,
-  quality: number
+  quality: number,
+  format?: string,
+  token?: string | null
 ): Promise<CompressionResult> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('quality', quality.toString());
 
+  const headers: HeadersInit = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const res = await fetch('/api/compress/pdf/', {
     method: 'POST',
     body: formData,
+    headers,
   });
 
   if (!res.ok) {
@@ -61,4 +81,12 @@ export async function compressPdf(
   const filename = filenameMatch ? filenameMatch[1] : 'compressed.pdf';
 
   return { blob, originalSize, compressedSize, filename };
+}
+
+export async function fetchHistory(token: string): Promise<HistoryRecord[]> {
+  const res = await fetch('/api/history/', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to load history');
+  return res.json();
 }

@@ -52,7 +52,7 @@ export async function compressImage(
 export async function compressPdf(
   file: File,
   quality: number,
-  format?: string,
+  _format?: string,
   token?: string | null
 ): Promise<CompressionResult> {
   const formData = new FormData();

@@ -8,4 +8,7 @@ const keycloakConfig = {
 
 const keycloak = new Keycloak(keycloakConfig);
 
+// Expose for debugging in browser console: window.__keycloak
+(window as any).__keycloak = keycloak;
+
 export default keycloak;

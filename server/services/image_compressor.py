@@ -105,7 +105,7 @@ def _compress_png(img: Image.Image, quality: int, icc_profile: bytes) -> bytes:
             os.unlink(tmp_path)
 
 
-def compress_image(input_bytes: bytes, quality: int = 70, output_format: str | None = None) -> dict:
+def compress_image(input_bytes: bytes, quality: int = 70, output_format: str | None = None, max_width: int | None = None) -> dict:
     """Compress an image using the best available tools."""
     original_size = len(input_bytes)
 
@@ -116,6 +116,12 @@ def compress_image(input_bytes: bytes, quality: int = 70, output_format: str | N
 
     # Convert to sRGB to preserve colors
     img = _convert_to_srgb(img)
+
+    # Resize if max_width is set and image is larger
+    if max_width and img.width > max_width:
+        ratio = max_width / img.width
+        new_height = round(img.height * ratio)
+        img = img.resize((max_width, new_height), Image.LANCZOS)
 
     # Determine output format
     fmt = output_format or img.format or "JPEG"

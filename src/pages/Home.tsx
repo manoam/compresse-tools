@@ -4,7 +4,7 @@ const features = [
   {
     path: '/compress-pdf',
     title: 'Compresser PDF',
-    description: 'Reduisez la taille de vos fichiers PDF sans perdre en qualite. Ideal pour les documents scannes.',
+    description: 'Réduisez la taille de vos fichiers PDF sans perdre en qualité. Idéal pour les documents scannés.',
     color: 'bg-red-50 border-red-200',
     iconColor: 'bg-red-100',
     icon: (
@@ -18,7 +18,7 @@ const features = [
   {
     path: '/compress-image',
     title: 'Compresser Image',
-    description: 'Compressez vos images JPG, PNG et WebP. Ajustez la qualite selon vos besoins.',
+    description: 'Compressez vos images JPG, PNG et WebP. Ajustez la qualité selon vos besoins.',
     color: 'bg-blue-50 border-blue-200',
     iconColor: 'bg-blue-100',
     icon: (
@@ -40,7 +40,7 @@ export default function Home() {
           <span className="text-primary-600"> en un clic</span>
         </h1>
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Outil gratuit pour compresser vos PDF et images. Rapide, securise, et directement dans votre navigateur.
+          Outil gratuit pour compresser vos PDF et images. Rapide, sécurisé, et directement dans votre navigateur.
         </p>
       </div>
 
@@ -72,7 +72,7 @@ export default function Home() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
-            100% Securise
+            100% Sécurisé
           </div>
           <div className="flex items-center gap-2">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

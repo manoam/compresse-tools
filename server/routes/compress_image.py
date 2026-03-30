@@ -18,6 +18,7 @@ async def compress_image_route(
     file: UploadFile = File(...),
     quality: int = Form(70),
     format: Optional[str] = Form(None),
+    max_width: int = Form(0),
     db: AsyncSession = Depends(get_db),
 ):
     try:
@@ -33,7 +34,7 @@ async def compress_image_route(
 
         quality = max(10, min(100, quality))
 
-        result = compress_image(input_bytes, quality, format if format else None)
+        result = compress_image(input_bytes, quality, format if format else None, max_width if max_width > 0 else None)
 
         out_ext = "jpg" if result["format"] == "jpeg" else result["format"]
         name = filename.rsplit(".", 1)[0] if "." in filename else "image"

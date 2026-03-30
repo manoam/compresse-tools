@@ -25,12 +25,14 @@ export async function compressImage(
   file: File,
   quality: number,
   format?: string,
-  token?: string | null
+  token?: string | null,
+  maxWidth?: number
 ): Promise<CompressionResult> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('quality', quality.toString());
   if (format) formData.append('format', format);
+  if (maxWidth && maxWidth > 0) formData.append('max_width', maxWidth.toString());
 
   const headers: HeadersInit = {};
   if (token) headers['Authorization'] = `Bearer ${token}`;

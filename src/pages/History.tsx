@@ -146,7 +146,7 @@ export default function History() {
 
       {!loading && !error && records.length === 0 && (
         <div className="text-center py-12 text-gray-400">
-          {searchQuery || typeFilter || userFilter ? 'Aucun resultat pour ces filtres.' : 'Aucune compression pour le moment.'}
+          {searchQuery || typeFilter || userFilter ? 'Aucun résultat pour ces filtres.' : 'Aucune compression pour le moment.'}
         </div>
       )}
 
@@ -161,8 +161,8 @@ export default function History() {
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Type</th>
                     {isAdmin && <th className="text-left px-4 py-3 font-medium text-gray-600">Utilisateur</th>}
                     <th className="text-right px-4 py-3 font-medium text-gray-600">Original</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-600">Compresse</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-600">Reduction</th>
+                    <th className="text-right px-4 py-3 font-medium text-gray-600">Compressé</th>
+                    <th className="text-right px-4 py-3 font-medium text-gray-600">Réduction</th>
                     <th className="text-right px-4 py-3 font-medium text-gray-600">Date</th>
                   </tr>
                 </thead>
@@ -219,7 +219,7 @@ export default function History() {
                   className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <ChevronLeft className="h-4 w-4" />
-                  Precedent
+                  Précédent
                 </button>
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}

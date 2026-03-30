@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import type { CompressionResult } from '../lib/api';
 
 interface UseCompressionOptions {
-  compressFn: (file: File, quality: number, format?: string, token?: string | null) => Promise<CompressionResult>;
+  compressFn: (file: File, quality: number, format?: string, token?: string | null, maxWidth?: number) => Promise<CompressionResult>;
   token?: string | null;
 }
 
@@ -13,13 +13,13 @@ export function useCompression({ compressFn, token }: UseCompressionOptions) {
   const [error, setError] = useState<string | null>(null);
 
   const compress = useCallback(
-    async (quality: number, format?: string) => {
+    async (quality: number, format?: string, maxWidth?: number) => {
       if (!file) return;
       setCompressing(true);
       setError(null);
       setResult(null);
       try {
-        const res = await compressFn(file, quality, format, token);
+        const res = await compressFn(file, quality, format, token, maxWidth);
         setResult(res);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Compression failed');

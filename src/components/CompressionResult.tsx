@@ -30,11 +30,11 @@ export default function CompressionResult({
           </svg>
         </div>
         <div>
-          <p className="text-lg font-semibold text-gray-900">Compression terminee !</p>
+          <p className="text-lg font-semibold text-gray-900">Compression terminée !</p>
           <p className="text-sm text-gray-500">
             {percent > 0
-              ? `${percent}% d'espace economise`
-              : 'Le fichier est deja optimise'}
+              ? `${percent}% d'espace économisé`
+              : 'Le fichier est déjà optimisé'}
           </p>
         </div>
       </div>
@@ -52,7 +52,7 @@ export default function CompressionResult({
         </div>
         <div>
           <div className="flex justify-between text-sm mb-1">
-            <span className="text-gray-600">Compresse</span>
+            <span className="text-gray-600">Compressé</span>
             <span className="font-medium text-green-600">{formatSize(compressedSize)}</span>
           </div>
           <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
@@ -67,7 +67,7 @@ export default function CompressionResult({
       {saved > 0 && (
         <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-center">
           <span className="text-green-700 font-semibold text-lg">{formatSize(saved)}</span>
-          <span className="text-green-600 text-sm ml-2">economises ({percent}%)</span>
+          <span className="text-green-600 text-sm ml-2">économisés ({percent}%)</span>
         </div>
       )}
 
@@ -76,7 +76,7 @@ export default function CompressionResult({
           onClick={onDownload}
           className="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-medium py-3 px-6 rounded-xl transition-colors cursor-pointer"
         >
-          Telecharger
+          Télécharger
         </button>
         <button
           onClick={onReset}

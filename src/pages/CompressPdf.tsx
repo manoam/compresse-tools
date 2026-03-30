@@ -6,9 +6,42 @@ import { useCompression } from '../hooks/useCompression';
 import { compressPdf } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
+const PRESETS = [
+  {
+    id: 'screen',
+    label: 'Pour le web',
+    desc: 'Lecture écran, email (72 dpi)',
+    quality: 20,
+    icon: '🌐',
+  },
+  {
+    id: 'ebook',
+    label: 'Équilibré',
+    desc: 'Bon compromis qualité/taille (150 dpi)',
+    quality: 50,
+    icon: '📄',
+  },
+  {
+    id: 'printer',
+    label: 'Pour l\'impression',
+    desc: 'Haute qualité (300 dpi)',
+    quality: 80,
+    icon: '🖨️',
+  },
+] as const;
+
+type PresetId = typeof PRESETS[number]['id'];
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
 export default function CompressPdf() {
   const { token } = useAuth();
-  const [quality] = useState(90);
+  const [preset, setPreset] = useState<PresetId>('ebook');
+  const quality = PRESETS.find(p => p.id === preset)!.quality;
   const { file, setFile, compressing, result, error, compress, download, reset } =
     useCompression({ compressFn: compressPdf, token });
 
@@ -23,13 +56,13 @@ export default function CompressPdf() {
           </svg>
         </div>
         <h1 className="text-3xl font-bold text-gray-900">Compresser PDF</h1>
-        <p className="text-gray-600 mt-2">Reduisez la taille de vos PDF - jusqu'a 50 MB</p>
+        <p className="text-gray-600 mt-2">Réduisez la taille de vos PDF - jusqu'à 50 MB</p>
       </div>
 
       {!file && !result && (
         <DropZone
           accept=".pdf"
-          label="Deposez votre PDF ici"
+          label="Déposez votre PDF ici"
           sublabel="ou cliquez pour parcourir"
           icon={
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -45,6 +78,28 @@ export default function CompressPdf() {
       {file && !result && (
         <div className="space-y-5">
           <FilePreview file={file} onRemove={reset} />
+
+          {/* Preset selector */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Pour quelle utilisation ?</label>
+            <div className="grid grid-cols-3 gap-3">
+              {PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setPreset(p.id as PresetId)}
+                  className={`p-3 rounded-xl border-2 text-left transition-all cursor-pointer ${
+                    preset === p.id
+                      ? 'border-red-300 bg-red-50 ring-2 ring-offset-1 ring-red-300'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <div className="text-lg mb-1">{p.icon}</div>
+                  <div className={`text-sm font-semibold ${preset === p.id ? 'text-red-800' : 'text-gray-800'}`}>{p.label}</div>
+                  <div className={`text-xs mt-0.5 ${preset === p.id ? 'text-red-600' : 'text-gray-500'}`}>{p.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
 
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-red-700 text-sm">

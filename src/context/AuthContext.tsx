@@ -27,19 +27,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
 
-  const updateUserInfo = useCallback(() => {
-    if (keycloak.tokenParsed) {
-      const parsed = keycloak.tokenParsed as Record<string, unknown>;
+  const updateUserInfo = useCallback(async () => {
+    if (!keycloak.authenticated) return;
+
+    // Token may not contain profile claims (federated users),
+    // so fetch from userinfo endpoint as fallback
+    try {
+      const userInfo = await keycloak.loadUserInfo() as Record<string, unknown>;
       setUser({
-        id: parsed.sub as string,
-        email: (parsed.email as string) || '',
-        username: (parsed.preferred_username as string) || '',
-        firstName: parsed.given_name as string | undefined,
-        lastName: parsed.family_name as string | undefined,
-        fullName: parsed.name as string | undefined,
+        id: (keycloak.tokenParsed?.sub as string) || '',
+        email: (userInfo.email as string) || '',
+        username: (userInfo.preferred_username as string) || '',
+        firstName: (userInfo.given_name as string) || '',
+        lastName: (userInfo.family_name as string) || '',
+        fullName: (userInfo.name as string) || '',
       });
-      setToken(keycloak.token || null);
+    } catch {
+      // Fallback to token claims if userinfo fails
+      const parsed = keycloak.tokenParsed as Record<string, unknown> | undefined;
+      setUser({
+        id: (parsed?.sub as string) || '',
+        email: (parsed?.email as string) || '',
+        username: (parsed?.preferred_username as string) || '',
+        firstName: (parsed?.given_name as string) || '',
+        lastName: (parsed?.family_name as string) || '',
+        fullName: (parsed?.name as string) || '',
+      });
     }
+    setToken(keycloak.token || null);
   }, []);
 
   useEffect(() => {

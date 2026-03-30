@@ -60,7 +60,7 @@ class RemoteErrorBoundary extends Component<RemoteErrorBoundaryProps, RemoteErro
 }
 
 export default function AppLayout() {
-  const { user, logout } = useAuth()
+  const { user, token, logout } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -145,6 +145,9 @@ export default function AppLayout() {
         <Suspense fallback={<HeaderFallback />}>
           <RemoteHeaderBar
             user={headerUser}
+            token={token}
+            platformUrl="https://plateform.konitys.fr"
+            apiBase="https://plateform-gateway.konitys.fr"
             onLogout={logout}
             currentAppName="CompressTool"
             onNavigate={handleNavigate}

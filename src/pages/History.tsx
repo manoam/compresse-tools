@@ -211,6 +211,11 @@ export default function History() {
                           <span className={`font-medium ${ratio > 0 ? 'text-green-600' : 'text-gray-400'}`}>
                             {ratio > 0 ? `-${ratio}%` : '0%'}
                           </span>
+                          {r.original_size - r.compressed_size > 0 && (
+                            <div className="text-xs text-green-500 mt-0.5">
+                              {formatSize(r.original_size - r.compressed_size)} économisés
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );

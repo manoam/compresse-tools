@@ -34,6 +34,20 @@ def _compress_pil_image(img: Image.Image, quality: int, max_dim: int) -> bytes:
     return out.getvalue()
 
 
+def _should_skip(xobj) -> bool:
+    """Check if image should be skipped (transparency, indexed, too small)."""
+    if xobj.get("/SMask"):
+        return True
+    cs = str(xobj.get("/ColorSpace", ""))
+    if "/Indexed" in cs:
+        return True
+    w = int(xobj.get("/Width", 0))
+    h = int(xobj.get("/Height", 0))
+    if w < 50 or h < 50:
+        return True
+    return False
+
+
 def compress_pdf(input_bytes: bytes, quality: str = "ebook") -> dict:
     """Compress PDF by recompressing each embedded image with Pillow."""
     original_size = len(input_bytes)
@@ -46,18 +60,84 @@ def compress_pdf(input_bytes: bytes, quality: str = "ebook") -> dict:
     except Exception as e:
         raise RuntimeError(f"Impossible d'ouvrir le PDF : {e}")
 
+    # First pass: collect ALL image objects and their compressed versions
+    # Key: (objgen) -> compressed stream data
+    compressed_cache = {}  # objgen -> (compressed_bytes, new_w, new_h, color_mode) or None
     images_processed = 0
-    images_skipped = 0
 
-    # Collect all image XObjects across all pages
-    seen = set()
-    for page in pdf.pages:
-        _process_page_images(pdf, page, img_quality, max_dim, seen)
+    # Iterate all objects in the PDF to find images (handles shared objects)
+    for obj in pdf.objects:
+        try:
+            if not hasattr(obj, 'get'):
+                continue
+            if str(obj.get("/Subtype", "")) != "/Image":
+                continue
 
-    # Count results
-    images_processed = len(seen)
+            objgen = obj.objgen
+            if objgen in compressed_cache:
+                continue
 
-    # Save compressed PDF
+            if _should_skip(obj):
+                compressed_cache[objgen] = None
+                continue
+
+            pil_img = _extract_image(pdf, obj)
+            if pil_img is None:
+                compressed_cache[objgen] = None
+                continue
+
+            original_raw_size = len(obj.read_raw_bytes())
+            compressed = _compress_pil_image(pil_img, img_quality, max_dim)
+
+            if len(compressed) < original_raw_size:
+                new_img = Image.open(io.BytesIO(compressed))
+                new_w, new_h = new_img.size
+                color_mode = pil_img.mode if pil_img.mode in ("RGB", "L") else "RGB"
+                compressed_cache[objgen] = (compressed, new_w, new_h, color_mode)
+                w, h = pil_img.size
+                print(f"  Compressed image obj{objgen}: {w}x{h} -> {new_w}x{new_h}, {original_raw_size} -> {len(compressed)} bytes")
+                images_processed += 1
+            else:
+                compressed_cache[objgen] = None
+                print(f"  Kept original image obj{objgen}: compressed would be larger")
+
+        except Exception as e:
+            continue
+
+    # Second pass: replace image data in-place on the actual objects
+    for obj in pdf.objects:
+        try:
+            if not hasattr(obj, 'get'):
+                continue
+            if str(obj.get("/Subtype", "")) != "/Image":
+                continue
+
+            objgen = obj.objgen
+            cached = compressed_cache.get(objgen)
+            if cached is None:
+                continue
+
+            compressed_bytes, new_w, new_h, color_mode = cached
+
+            # Replace the stream data in-place
+            obj.write(compressed_bytes, filter=pikepdf.Name("/DCTDecode"))
+            obj["/Width"] = new_w
+            obj["/Height"] = new_h
+            obj["/BitsPerComponent"] = 8
+            if color_mode == "L":
+                obj["/ColorSpace"] = pikepdf.Name("/DeviceGray")
+            else:
+                obj["/ColorSpace"] = pikepdf.Name("/DeviceRGB")
+
+            # Remove old filter-related keys
+            for key_to_remove in ["/DecodeParms", "/SMask"]:
+                if key_to_remove in obj:
+                    del obj[key_to_remove]
+
+        except Exception:
+            continue
+
+    # Save
     out_buf = io.BytesIO()
     pdf.save(out_buf, linearize=True, compress_streams=True)
     compressed_bytes = out_buf.getvalue()
@@ -78,151 +158,3 @@ def compress_pdf(input_bytes: bytes, quality: str = "ebook") -> dict:
         "original_size": original_size,
         "compressed_size": compressed_size,
     }
-
-
-def _process_page_images(pdf, page, img_quality, max_dim, seen):
-    """Process all images in a page's resources."""
-    try:
-        resources = page.get("/Resources")
-        if not resources:
-            return
-        xobjects = resources.get("/XObject")
-        if not xobjects:
-            return
-    except Exception:
-        return
-
-    for key in list(xobjects.keys()):
-        try:
-            xobj = xobjects[key]
-
-            # Skip if not an image
-            subtype = xobj.get("/Subtype")
-            if str(subtype) != "/Image":
-                # Could be a Form XObject containing images
-                if str(subtype) == "/Form":
-                    _process_form_xobject(pdf, xobj, img_quality, max_dim, seen)
-                continue
-
-            # Skip if already processed (same object ID)
-            obj_id = id(xobj)
-            if obj_id in seen:
-                continue
-            seen.add(obj_id)
-
-            # Try to extract as PIL image using pikepdf's built-in support
-            pil_img = _extract_image(pdf, xobj)
-            if pil_img is None:
-                print(f"  Skipped image {key}: could not extract")
-                continue
-
-            # Get original raw size
-            original_raw_size = len(xobj.read_raw_bytes())
-
-            # Skip tiny images (icons, logos)
-            w, h = pil_img.size
-            if w < 50 or h < 50:
-                continue
-
-            # Skip images with transparency (SMask) - JPEG doesn't support it
-            if xobj.get("/SMask"):
-                print(f"  Skipped image {key}: has transparency (SMask)")
-                continue
-
-            # Skip images with Indexed/special ColorSpace - risky to convert
-            cs = str(xobj.get("/ColorSpace", ""))
-            if "/Indexed" in cs:
-                print(f"  Skipped image {key}: Indexed ColorSpace")
-                continue
-
-            # Recompress
-            compressed = _compress_pil_image(pil_img, img_quality, max_dim)
-
-            # Only replace if smaller
-            if len(compressed) < original_raw_size:
-                # Get new dimensions
-                new_img = Image.open(io.BytesIO(compressed))
-                new_w, new_h = new_img.size
-
-                new_stream = pikepdf.Stream(pdf, compressed)
-                new_stream["/Filter"] = pikepdf.Name("/DCTDecode")
-                new_stream["/Width"] = new_w
-                new_stream["/Height"] = new_h
-                new_stream["/BitsPerComponent"] = 8
-
-                if pil_img.mode == "L":
-                    new_stream["/ColorSpace"] = pikepdf.Name("/DeviceGray")
-                else:
-                    new_stream["/ColorSpace"] = pikepdf.Name("/DeviceRGB")
-
-                xobjects[key] = new_stream
-                print(f"  Compressed image {key}: {w}x{h} -> {new_w}x{new_h}, {original_raw_size} -> {len(compressed)} bytes")
-            else:
-                print(f"  Kept original image {key}: compressed would be larger")
-
-        except Exception as e:
-            print(f"  Error processing image {key}: {e}")
-            continue
-
-
-def _process_form_xobject(pdf, form_xobj, img_quality, max_dim, seen):
-    """Process images inside a Form XObject (nested resources)."""
-    try:
-        resources = form_xobj.get("/Resources")
-        if not resources:
-            return
-        xobjects = resources.get("/XObject")
-        if not xobjects:
-            return
-
-        for key in list(xobjects.keys()):
-            try:
-                xobj = xobjects[key]
-                subtype = xobj.get("/Subtype")
-                if str(subtype) != "/Image":
-                    continue
-
-                obj_id = id(xobj)
-                if obj_id in seen:
-                    continue
-                seen.add(obj_id)
-
-                pil_img = _extract_image(pdf, xobj)
-                if pil_img is None:
-                    continue
-
-                # Skip images with transparency or Indexed ColorSpace
-                if xobj.get("/SMask"):
-                    continue
-                cs = str(xobj.get("/ColorSpace", ""))
-                if "/Indexed" in cs:
-                    continue
-
-                original_raw_size = len(xobj.read_raw_bytes())
-                w, h = pil_img.size
-                if w < 50 or h < 50:
-                    continue
-
-                compressed = _compress_pil_image(pil_img, img_quality, max_dim)
-
-                if len(compressed) < original_raw_size:
-                    new_img = Image.open(io.BytesIO(compressed))
-                    new_w, new_h = new_img.size
-
-                    new_stream = pikepdf.Stream(pdf, compressed)
-                    new_stream["/Filter"] = pikepdf.Name("/DCTDecode")
-                    new_stream["/Width"] = new_w
-                    new_stream["/Height"] = new_h
-                    new_stream["/BitsPerComponent"] = 8
-
-                    if pil_img.mode == "L":
-                        new_stream["/ColorSpace"] = pikepdf.Name("/DeviceGray")
-                    else:
-                        new_stream["/ColorSpace"] = pikepdf.Name("/DeviceRGB")
-
-                    xobjects[key] = new_stream
-
-            except Exception:
-                continue
-    except Exception:
-        return

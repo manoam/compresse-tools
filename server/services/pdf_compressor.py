@@ -119,9 +119,20 @@ def _process_page_images(pdf, page, img_quality, max_dim, seen):
             # Get original raw size
             original_raw_size = len(xobj.read_raw_bytes())
 
-            # Skip tiny images (icons, logos) - not worth recompressing
+            # Skip tiny images (icons, logos)
             w, h = pil_img.size
             if w < 50 or h < 50:
+                continue
+
+            # Skip images with transparency (SMask) - JPEG doesn't support it
+            if xobj.get("/SMask"):
+                print(f"  Skipped image {key}: has transparency (SMask)")
+                continue
+
+            # Skip images with Indexed/special ColorSpace - risky to convert
+            cs = str(xobj.get("/ColorSpace", ""))
+            if "/Indexed" in cs:
+                print(f"  Skipped image {key}: Indexed ColorSpace")
                 continue
 
             # Recompress
@@ -178,6 +189,13 @@ def _process_form_xobject(pdf, form_xobj, img_quality, max_dim, seen):
 
                 pil_img = _extract_image(pdf, xobj)
                 if pil_img is None:
+                    continue
+
+                # Skip images with transparency or Indexed ColorSpace
+                if xobj.get("/SMask"):
+                    continue
+                cs = str(xobj.get("/ColorSpace", ""))
+                if "/Indexed" in cs:
                     continue
 
                 original_raw_size = len(xobj.read_raw_bytes())

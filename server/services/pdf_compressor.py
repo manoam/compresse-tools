@@ -2,7 +2,6 @@ import io
 import pikepdf
 from PIL import Image
 
-# Profiles: quality = Pillow JPEG quality, max_dim = max width or height for images
 PROFILES = {
     "screen": {"quality": 40, "max_dim": 1200},
     "ebook": {"quality": 60, "max_dim": 1800},
@@ -10,26 +9,29 @@ PROFILES = {
 }
 
 
-def _recompress_image(raw_data: bytes, quality: int, max_dim: int) -> bytes | None:
-    """Recompress a single image with Pillow. Returns JPEG bytes or None if failed."""
+def _extract_image(pdf: pikepdf.Pdf, xobj) -> Image.Image | None:
+    """Try to extract an image from a PDF XObject as a PIL Image."""
     try:
-        img = Image.open(io.BytesIO(raw_data))
-
-        # Convert to RGB if needed (CMYK, RGBA, P, etc.)
-        if img.mode not in ("RGB", "L"):
-            img = img.convert("RGB")
-
-        # Resize if too large
-        w, h = img.size
-        if max_dim > 0 and (w > max_dim or h > max_dim):
-            ratio = min(max_dim / w, max_dim / h)
-            img = img.resize((round(w * ratio), round(h * ratio)), Image.LANCZOS)
-
-        out = io.BytesIO()
-        img.save(out, format="JPEG", quality=quality, optimize=True)
-        return out.getvalue()
+        pdfimage = pikepdf.PdfImage(xobj)
+        pil_image = pdfimage.as_pil_image()
+        return pil_image
     except Exception:
         return None
+
+
+def _compress_pil_image(img: Image.Image, quality: int, max_dim: int) -> bytes:
+    """Compress a PIL image to JPEG bytes."""
+    if img.mode not in ("RGB", "L"):
+        img = img.convert("RGB")
+
+    w, h = img.size
+    if max_dim > 0 and (w > max_dim or h > max_dim):
+        ratio = min(max_dim / w, max_dim / h)
+        img = img.resize((round(w * ratio), round(h * ratio)), Image.LANCZOS)
+
+    out = io.BytesIO()
+    img.save(out, format="JPEG", quality=quality, optimize=True)
+    return out.getvalue()
 
 
 def compress_pdf(input_bytes: bytes, quality: str = "ebook") -> dict:
@@ -45,114 +47,24 @@ def compress_pdf(input_bytes: bytes, quality: str = "ebook") -> dict:
         raise RuntimeError(f"Impossible d'ouvrir le PDF : {e}")
 
     images_processed = 0
+    images_skipped = 0
 
+    # Collect all image XObjects across all pages
+    seen = set()
     for page in pdf.pages:
-        try:
-            resources = page.get("/Resources", {})
-            xobjects = resources.get("/XObject", {})
-        except Exception:
-            continue
+        _process_page_images(pdf, page, img_quality, max_dim, seen)
 
-        for key in list(xobjects.keys()):
-            try:
-                xobj = xobjects[key]
-                if not hasattr(xobj, "read_bytes"):
-                    continue
-
-                subtype = xobj.get("/Subtype")
-                if str(subtype) != "/Image":
-                    continue
-
-                # Read raw image data
-                raw_data = xobj.read_raw_bytes()
-                width = int(xobj.get("/Width", 0))
-                height = int(xobj.get("/Height", 0))
-
-                if width == 0 or height == 0:
-                    continue
-
-                # Try to extract the image as PIL-readable data
-                filter_name = str(xobj.get("/Filter", ""))
-
-                if "/DCTDecode" in filter_name:
-                    # Already JPEG - recompress
-                    img_data = raw_data
-                elif "/FlateDecode" in filter_name:
-                    # PNG-like data - decompress first
-                    try:
-                        img_data = xobj.read_bytes()
-                        # Reconstruct raw image from pixel data
-                        bpc = int(xobj.get("/BitsPerComponent", 8))
-                        cs = str(xobj.get("/ColorSpace", "/DeviceRGB"))
-                        if "/DeviceRGB" in cs:
-                            mode = "RGB"
-                        elif "/DeviceGray" in cs:
-                            mode = "L"
-                        else:
-                            continue
-
-                        img = Image.frombytes(mode, (width, height), img_data)
-
-                        # Resize if needed
-                        w, h = img.size
-                        if max_dim > 0 and (w > max_dim or h > max_dim):
-                            ratio = min(max_dim / w, max_dim / h)
-                            img = img.resize((round(w * ratio), round(h * ratio)), Image.LANCZOS)
-
-                        out = io.BytesIO()
-                        img.save(out, format="JPEG", quality=img_quality, optimize=True)
-                        compressed = out.getvalue()
-
-                        if len(compressed) < len(raw_data):
-                            new_img = pikepdf.Stream(pdf, compressed)
-                            new_img["/Filter"] = pikepdf.Name("/DCTDecode")
-                            new_img["/Width"] = img.size[0]
-                            new_img["/Height"] = img.size[1]
-                            new_img["/ColorSpace"] = pikepdf.Name("/DeviceRGB") if img.mode == "RGB" else pikepdf.Name("/DeviceGray")
-                            new_img["/BitsPerComponent"] = 8
-                            xobjects[key] = new_img
-                            images_processed += 1
-                        continue
-                    except Exception:
-                        continue
-                else:
-                    continue
-
-                # Recompress JPEG images
-                compressed = _recompress_image(img_data, img_quality, max_dim)
-                if compressed and len(compressed) < len(raw_data):
-                    new_img = pikepdf.Stream(pdf, compressed)
-                    new_img["/Filter"] = pikepdf.Name("/DCTDecode")
-
-                    # Get new dimensions
-                    try:
-                        pil_img = Image.open(io.BytesIO(compressed))
-                        new_img["/Width"] = pil_img.size[0]
-                        new_img["/Height"] = pil_img.size[1]
-                    except Exception:
-                        new_img["/Width"] = width
-                        new_img["/Height"] = height
-
-                    cs = xobj.get("/ColorSpace")
-                    if cs:
-                        new_img["/ColorSpace"] = cs
-                    else:
-                        new_img["/ColorSpace"] = pikepdf.Name("/DeviceRGB")
-                    new_img["/BitsPerComponent"] = 8
-
-                    xobjects[key] = new_img
-                    images_processed += 1
-
-            except Exception:
-                continue
+    # Count results
+    images_processed = len(seen)
 
     # Save compressed PDF
     out_buf = io.BytesIO()
     pdf.save(out_buf, linearize=True, compress_streams=True)
     compressed_bytes = out_buf.getvalue()
     compressed_size = len(compressed_bytes)
-
     pdf.close()
+
+    print(f"PDF compression: {images_processed} images processed, {original_size} -> {compressed_size}")
 
     if compressed_size >= original_size:
         return {
@@ -166,3 +78,133 @@ def compress_pdf(input_bytes: bytes, quality: str = "ebook") -> dict:
         "original_size": original_size,
         "compressed_size": compressed_size,
     }
+
+
+def _process_page_images(pdf, page, img_quality, max_dim, seen):
+    """Process all images in a page's resources."""
+    try:
+        resources = page.get("/Resources")
+        if not resources:
+            return
+        xobjects = resources.get("/XObject")
+        if not xobjects:
+            return
+    except Exception:
+        return
+
+    for key in list(xobjects.keys()):
+        try:
+            xobj = xobjects[key]
+
+            # Skip if not an image
+            subtype = xobj.get("/Subtype")
+            if str(subtype) != "/Image":
+                # Could be a Form XObject containing images
+                if str(subtype) == "/Form":
+                    _process_form_xobject(pdf, xobj, img_quality, max_dim, seen)
+                continue
+
+            # Skip if already processed (same object ID)
+            obj_id = id(xobj)
+            if obj_id in seen:
+                continue
+            seen.add(obj_id)
+
+            # Try to extract as PIL image using pikepdf's built-in support
+            pil_img = _extract_image(pdf, xobj)
+            if pil_img is None:
+                print(f"  Skipped image {key}: could not extract")
+                continue
+
+            # Get original raw size
+            original_raw_size = len(xobj.read_raw_bytes())
+
+            # Skip tiny images (icons, logos) - not worth recompressing
+            w, h = pil_img.size
+            if w < 50 or h < 50:
+                continue
+
+            # Recompress
+            compressed = _compress_pil_image(pil_img, img_quality, max_dim)
+
+            # Only replace if smaller
+            if len(compressed) < original_raw_size:
+                # Get new dimensions
+                new_img = Image.open(io.BytesIO(compressed))
+                new_w, new_h = new_img.size
+
+                new_stream = pikepdf.Stream(pdf, compressed)
+                new_stream["/Filter"] = pikepdf.Name("/DCTDecode")
+                new_stream["/Width"] = new_w
+                new_stream["/Height"] = new_h
+                new_stream["/BitsPerComponent"] = 8
+
+                if pil_img.mode == "L":
+                    new_stream["/ColorSpace"] = pikepdf.Name("/DeviceGray")
+                else:
+                    new_stream["/ColorSpace"] = pikepdf.Name("/DeviceRGB")
+
+                xobjects[key] = new_stream
+                print(f"  Compressed image {key}: {w}x{h} -> {new_w}x{new_h}, {original_raw_size} -> {len(compressed)} bytes")
+            else:
+                print(f"  Kept original image {key}: compressed would be larger")
+
+        except Exception as e:
+            print(f"  Error processing image {key}: {e}")
+            continue
+
+
+def _process_form_xobject(pdf, form_xobj, img_quality, max_dim, seen):
+    """Process images inside a Form XObject (nested resources)."""
+    try:
+        resources = form_xobj.get("/Resources")
+        if not resources:
+            return
+        xobjects = resources.get("/XObject")
+        if not xobjects:
+            return
+
+        for key in list(xobjects.keys()):
+            try:
+                xobj = xobjects[key]
+                subtype = xobj.get("/Subtype")
+                if str(subtype) != "/Image":
+                    continue
+
+                obj_id = id(xobj)
+                if obj_id in seen:
+                    continue
+                seen.add(obj_id)
+
+                pil_img = _extract_image(pdf, xobj)
+                if pil_img is None:
+                    continue
+
+                original_raw_size = len(xobj.read_raw_bytes())
+                w, h = pil_img.size
+                if w < 50 or h < 50:
+                    continue
+
+                compressed = _compress_pil_image(pil_img, img_quality, max_dim)
+
+                if len(compressed) < original_raw_size:
+                    new_img = Image.open(io.BytesIO(compressed))
+                    new_w, new_h = new_img.size
+
+                    new_stream = pikepdf.Stream(pdf, compressed)
+                    new_stream["/Filter"] = pikepdf.Name("/DCTDecode")
+                    new_stream["/Width"] = new_w
+                    new_stream["/Height"] = new_h
+                    new_stream["/BitsPerComponent"] = 8
+
+                    if pil_img.mode == "L":
+                        new_stream["/ColorSpace"] = pikepdf.Name("/DeviceGray")
+                    else:
+                        new_stream["/ColorSpace"] = pikepdf.Name("/DeviceRGB")
+
+                    xobjects[key] = new_stream
+
+            except Exception:
+                continue
+    except Exception:
+        return

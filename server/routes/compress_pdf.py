@@ -36,8 +36,8 @@ async def compress_pdf_route(
 
         input_bytes = await file.read()
 
-        if len(input_bytes) > 50 * 1024 * 1024:
-            return Response(content="File too large (max 50MB)", status_code=400)
+        if len(input_bytes) > 200 * 1024 * 1024:
+            return Response(content="Fichier trop volumineux (max 200 Mo)", status_code=400)
 
         quality = max(10, min(100, quality))
         preset = quality_to_preset(quality)

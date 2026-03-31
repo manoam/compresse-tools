@@ -87,7 +87,7 @@ def compress_pdf(input_bytes: bytes, quality: str = "ebook") -> dict:
             tmp_in_path,
         ]
 
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
 
         if result.returncode != 0:
             # Fallback: simpler command
@@ -107,7 +107,7 @@ def compress_pdf(input_bytes: bytes, quality: str = "ebook") -> dict:
                 f"-sOutputFile={tmp_out_path}",
                 tmp_in_path,
             ]
-            result = subprocess.run(cmd_simple, capture_output=True, text=True, timeout=120)
+            result = subprocess.run(cmd_simple, capture_output=True, text=True, timeout=600)
             if result.returncode != 0:
                 raise RuntimeError(f"Ghostscript error: {result.stderr}")
 

@@ -1,6 +1,6 @@
 import io
 import pikepdf
-from PIL import Image, ImageCms
+from PIL import Image
 
 PROFILES = {
     "screen": {"quality": 40, "max_dim": 1200},
@@ -19,21 +19,14 @@ def _extract_image(pdf: pikepdf.Pdf, xobj) -> Image.Image | None:
         return None
 
 
-def _cmyk_to_rgb(img: Image.Image) -> Image.Image:
-    """Convert CMYK to RGB with proper color handling."""
-    # Try ICC-based conversion first (most accurate)
-    try:
-        srgb_profile = ImageCms.createProfile("sRGB")
-        # Pillow can convert CMYK to RGB directly
-        return img.convert("RGB")
-    except Exception:
-        return img.convert("RGB")
 
+def _compress_pil_image(img: Image.Image, quality: int, max_dim: int) -> tuple[bytes, str]:
+    """Compress a PIL image to JPEG bytes. Returns (bytes, color_mode)."""
+    original_mode = img.mode
 
-def _compress_pil_image(img: Image.Image, quality: int, max_dim: int) -> bytes:
-    """Compress a PIL image to JPEG bytes."""
+    # Keep CMYK as CMYK for accurate colors, convert others to RGB
     if img.mode == "CMYK":
-        img = _cmyk_to_rgb(img)
+        pass  # Keep as-is, JPEG supports CMYK
     elif img.mode not in ("RGB", "L"):
         img = img.convert("RGB")
 
@@ -44,7 +37,7 @@ def _compress_pil_image(img: Image.Image, quality: int, max_dim: int) -> bytes:
 
     out = io.BytesIO()
     img.save(out, format="JPEG", quality=quality, optimize=True)
-    return out.getvalue()
+    return out.getvalue(), img.mode
 
 
 def _should_skip(xobj) -> bool:
@@ -100,12 +93,11 @@ def compress_pdf(input_bytes: bytes, quality: str = "ebook") -> dict:
                 continue
 
             original_raw_size = len(obj.read_raw_bytes())
-            compressed = _compress_pil_image(pil_img, img_quality, max_dim)
+            compressed, color_mode = _compress_pil_image(pil_img, img_quality, max_dim)
 
             if len(compressed) < original_raw_size:
                 new_img = Image.open(io.BytesIO(compressed))
                 new_w, new_h = new_img.size
-                color_mode = pil_img.mode if pil_img.mode in ("RGB", "L") else "RGB"
                 compressed_cache[objgen] = (compressed, new_w, new_h, color_mode)
                 w, h = pil_img.size
                 print(f"  Compressed image obj{objgen}: {w}x{h} -> {new_w}x{new_h}, {original_raw_size} -> {len(compressed)} bytes")
@@ -140,7 +132,9 @@ def compress_pdf(input_bytes: bytes, quality: str = "ebook") -> dict:
             obj["/Width"] = new_w
             obj["/Height"] = new_h
             obj["/BitsPerComponent"] = 8
-            if color_mode == "L":
+            if color_mode == "CMYK":
+                obj["/ColorSpace"] = pikepdf.Name("/DeviceCMYK")
+            elif color_mode == "L":
                 obj["/ColorSpace"] = pikepdf.Name("/DeviceGray")
             else:
                 obj["/ColorSpace"] = pikepdf.Name("/DeviceRGB")

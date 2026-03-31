@@ -41,9 +41,7 @@ def _compress_pil_image(img: Image.Image, quality: int, max_dim: int) -> tuple[b
 
 
 def _should_skip(xobj) -> bool:
-    """Check if image should be skipped (transparency, indexed, too small)."""
-    if xobj.get("/SMask"):
-        return True
+    """Check if image should be skipped (indexed, too small)."""
     cs = str(xobj.get("/ColorSpace", ""))
     if "/Indexed" in cs:
         return True
@@ -51,6 +49,8 @@ def _should_skip(xobj) -> bool:
     h = int(xobj.get("/Height", 0))
     if w < 50 or h < 50:
         return True
+    # Skip SMask images themselves (grayscale masks)
+    # But DON'T skip images that HAVE an SMask - we can still compress them
     return False
 
 
@@ -139,10 +139,26 @@ def compress_pdf(input_bytes: bytes, quality: str = "ebook") -> dict:
             else:
                 obj["/ColorSpace"] = pikepdf.Name("/DeviceRGB")
 
-            # Remove old filter-related keys
-            for key_to_remove in ["/DecodeParms", "/SMask"]:
-                if key_to_remove in obj:
-                    del obj[key_to_remove]
+            # Remove old decode params (no longer valid after recompression)
+            if "/DecodeParms" in obj:
+                del obj["/DecodeParms"]
+
+            # Resize SMask if image dimensions changed
+            smask = obj.get("/SMask")
+            if smask and (new_w != int(smask.get("/Width", 0)) or new_h != int(smask.get("/Height", 0))):
+                try:
+                    smask_img = pikepdf.PdfImage(smask).as_pil_image()
+                    smask_resized = smask_img.resize((new_w, new_h), Image.LANCZOS)
+                    out = io.BytesIO()
+                    smask_resized.save(out, format="PNG")
+                    smask_pil = Image.open(io.BytesIO(out.getvalue()))
+                    # Write resized mask back
+                    smask_bytes = smask_resized.tobytes()
+                    smask.write(smask_bytes, filter=pikepdf.Name("/FlateDecode"))
+                    smask["/Width"] = new_w
+                    smask["/Height"] = new_h
+                except Exception:
+                    pass  # Keep original SMask if resize fails
 
         except Exception:
             continue

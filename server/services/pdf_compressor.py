@@ -3,9 +3,9 @@ import pikepdf
 from PIL import Image
 
 PROFILES = {
-    "screen": {"quality": 30, "max_dim": 900},
-    "ebook": {"quality": 55, "max_dim": 1500},
-    "printer": {"quality": 80, "max_dim": 2500},
+    "screen": {"quality": 40, "max_dim": 1200},
+    "ebook": {"quality": 60, "max_dim": 1800},
+    "printer": {"quality": 85, "max_dim": 3000},
 }
 
 

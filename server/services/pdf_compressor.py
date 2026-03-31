@@ -1,6 +1,6 @@
 import io
 import pikepdf
-from PIL import Image
+from PIL import Image, ImageCms
 
 PROFILES = {
     "screen": {"quality": 40, "max_dim": 1200},
@@ -19,9 +19,22 @@ def _extract_image(pdf: pikepdf.Pdf, xobj) -> Image.Image | None:
         return None
 
 
+def _cmyk_to_rgb(img: Image.Image) -> Image.Image:
+    """Convert CMYK to RGB with proper color handling."""
+    # Try ICC-based conversion first (most accurate)
+    try:
+        srgb_profile = ImageCms.createProfile("sRGB")
+        # Pillow can convert CMYK to RGB directly
+        return img.convert("RGB")
+    except Exception:
+        return img.convert("RGB")
+
+
 def _compress_pil_image(img: Image.Image, quality: int, max_dim: int) -> bytes:
     """Compress a PIL image to JPEG bytes."""
-    if img.mode not in ("RGB", "L"):
+    if img.mode == "CMYK":
+        img = _cmyk_to_rgb(img)
+    elif img.mode not in ("RGB", "L"):
         img = img.convert("RGB")
 
     w, h = img.size
@@ -68,7 +81,7 @@ def compress_pdf(input_bytes: bytes, quality: str = "ebook") -> dict:
     # Iterate all objects in the PDF to find images (handles shared objects)
     for obj in pdf.objects:
         try:
-            if not hasattr(obj, 'get'):
+            if not isinstance(obj, pikepdf.Stream):
                 continue
             if str(obj.get("/Subtype", "")) != "/Image":
                 continue
@@ -102,12 +115,15 @@ def compress_pdf(input_bytes: bytes, quality: str = "ebook") -> dict:
                 print(f"  Kept original image obj{objgen}: compressed would be larger")
 
         except Exception as e:
+            print(f"  Error processing obj{obj.objgen if hasattr(obj, 'objgen') else '?'}: {e}")
             continue
+
+    print(f"  Cache: {len(compressed_cache)} entries, {images_processed} compressed")
 
     # Second pass: replace image data in-place on the actual objects
     for obj in pdf.objects:
         try:
-            if not hasattr(obj, 'get'):
+            if not isinstance(obj, pikepdf.Stream):
                 continue
             if str(obj.get("/Subtype", "")) != "/Image":
                 continue

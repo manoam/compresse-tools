@@ -18,6 +18,8 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ghostscript \
         pngquant \
+        qpdf \
+        libqpdf-dev \
         wget \
         cmake \
         nasm \

@@ -95,6 +95,7 @@ export async function compressPdf(
 export interface HistoryResponse {
   data: HistoryRecord[];
   total: number;
+  total_saved: number;
   page: number;
   per_page: number;
   total_pages: number;

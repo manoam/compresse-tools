@@ -33,11 +33,18 @@ async def get_history(
     if search:
         filters.append(CompressionHistory.filename.ilike(f"%{search}%"))
 
-    # Count total
+    # Count total + total saved bytes
     count_stmt = select(func.count()).select_from(CompressionHistory)
     if filters:
         count_stmt = count_stmt.where(*filters)
     total = (await db.execute(count_stmt)).scalar() or 0
+
+    saved_stmt = select(
+        func.coalesce(func.sum(CompressionHistory.original_size - CompressionHistory.compressed_size), 0)
+    ).select_from(CompressionHistory)
+    if filters:
+        saved_stmt = saved_stmt.where(*filters)
+    total_saved = (await db.execute(saved_stmt)).scalar() or 0
 
     # Fetch page
     offset = (page - 1) * per_page
@@ -67,6 +74,7 @@ async def get_history(
             for r in records
         ],
         "total": total,
+        "total_saved": total_saved,
         "page": page,
         "per_page": per_page,
         "total_pages": (total + per_page - 1) // per_page if total > 0 else 1,

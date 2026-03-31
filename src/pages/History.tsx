@@ -1,12 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { fetchHistory, fetchHistoryUsers, type HistoryRecord, type HistoryResponse, type HistoryUser } from '../lib/api';
-import { Search, ChevronLeft, ChevronRight, Filter, Users } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Filter, Users, TrendingDown } from 'lucide-react';
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} Go`;
 }
 
 function formatDate(iso: string): string {
@@ -30,6 +31,7 @@ export default function History() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [totalSaved, setTotalSaved] = useState(0);
   const perPage = 20;
 
   const [typeFilter, setTypeFilter] = useState<string>('');
@@ -39,7 +41,6 @@ export default function History() {
 
   const [users, setUsers] = useState<HistoryUser[]>([]);
 
-  // Load users list (admin only)
   useEffect(() => {
     if (!token) return;
     fetchHistoryUsers(token).then(setUsers);
@@ -60,6 +61,7 @@ export default function History() {
       setRecords(res.data);
       setTotalPages(res.total_pages);
       setTotal(res.total);
+      setTotalSaved(res.total_saved);
       setIsAdmin(res.is_admin);
     } catch (e: any) {
       setError(e.message);
@@ -72,7 +74,6 @@ export default function History() {
     loadHistory();
   }, [loadHistory]);
 
-  // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1);
   }, [typeFilter, searchQuery, userFilter]);
@@ -88,6 +89,19 @@ export default function History() {
         <h1 className="text-2xl font-bold text-gray-900">Historique des compressions</h1>
         <p className="text-gray-500 text-sm mt-1">{total} compression{total !== 1 ? 's' : ''} au total</p>
       </div>
+
+      {/* Savings banner */}
+      {!loading && totalSaved > 0 && (
+        <div className="mb-5 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl px-5 py-4 flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-100 shrink-0">
+            <TrendingDown className="h-6 w-6 text-green-600" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-green-700">{formatSize(totalSaved)} d'économisés !</p>
+            <p className="text-sm text-green-600">grâce à vos {total} compression{total !== 1 ? 's' : ''}</p>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-5">
@@ -157,13 +171,13 @@ export default function History() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Fichier</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Type</th>
                     {isAdmin && <th className="text-left px-4 py-3 font-medium text-gray-600">Utilisateur</th>}
                     <th className="text-right px-4 py-3 font-medium text-gray-600">Original</th>
                     <th className="text-right px-4 py-3 font-medium text-gray-600">Compressé</th>
                     <th className="text-right px-4 py-3 font-medium text-gray-600">Réduction</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-600">Date</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -173,6 +187,9 @@ export default function History() {
                       : 0;
                     return (
                       <tr key={r.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                        <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                          {r.created_at ? formatDate(r.created_at) : '-'}
+                        </td>
                         <td className="px-4 py-3 text-gray-900 truncate max-w-[200px]" title={r.filename}>
                           {r.filename}
                         </td>
@@ -194,9 +211,6 @@ export default function History() {
                           <span className={`font-medium ${ratio > 0 ? 'text-green-600' : 'text-gray-400'}`}>
                             {ratio > 0 ? `-${ratio}%` : '0%'}
                           </span>
-                        </td>
-                        <td className="px-4 py-3 text-right text-gray-500 whitespace-nowrap">
-                          {r.created_at ? formatDate(r.created_at) : '-'}
                         </td>
                       </tr>
                     );

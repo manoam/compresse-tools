@@ -26,45 +26,35 @@ def _find_ghostscript() -> str:
 
 GS_PATH = _find_ghostscript()
 
-# Compression profiles with explicit image downsampling settings
 PROFILES = {
-    "screen": {
-        "dpi": 72,
-        "image_quality": 40,
-        "desc": "Web / écran (72 dpi)",
-    },
-    "ebook": {
-        "dpi": 150,
-        "image_quality": 60,
-        "desc": "Équilibré (150 dpi)",
-    },
-    "printer": {
-        "dpi": 300,
-        "image_quality": 80,
-        "desc": "Impression (300 dpi)",
-    },
-    "prepress": {
-        "dpi": 300,
-        "image_quality": 95,
-        "desc": "Qualité maximale",
-    },
+    "screen": {"dpi": 72, "qfactor": 0.76},
+    "ebook": {"dpi": 150, "qfactor": 0.40},
+    "printer": {"dpi": 300, "qfactor": 0.15},
 }
 
 
 def compress_pdf(input_bytes: bytes, quality: str = "ebook") -> dict:
-    """
-    Compress a PDF using Ghostscript with aggressive image optimization.
-    """
+    """Compress a PDF using Ghostscript with aggressive image optimization."""
     original_size = len(input_bytes)
     profile = PROFILES.get(quality, PROFILES["ebook"])
     dpi = profile["dpi"]
-    img_quality = profile["image_quality"]
+    qfactor = profile["qfactor"]
 
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_in:
         tmp_in.write(input_bytes)
         tmp_in_path = tmp_in.name
 
     tmp_out_path = tmp_in_path.replace(".pdf", "_compressed.pdf")
+
+    # Write PostScript config file for image compression settings
+    ps_config_path = tmp_in_path.replace(".pdf", "_config.ps")
+    with open(ps_config_path, "w") as ps:
+        ps.write(f"""
+<<
+  /ColorImageDict << /QFactor {qfactor} /Blend 1 /HSamples [2 1 1 2] /VSamples [2 1 1 2] >>
+  /GrayImageDict << /QFactor {qfactor} /Blend 1 /HSamples [2 1 1 2] /VSamples [2 1 1 2] >>
+>> setdistillerparams
+""")
 
     try:
         cmd = [
@@ -75,33 +65,32 @@ def compress_pdf(input_bytes: bytes, quality: str = "ebook") -> dict:
             "-dNOPAUSE",
             "-dBATCH",
             "-dQUIET",
-            # Force image downsampling
+            # Image downsampling
             "-dDownsampleColorImages=true",
             "-dDownsampleGrayImages=true",
             "-dDownsampleMonoImages=true",
             f"-dColorImageResolution={dpi}",
             f"-dGrayImageResolution={dpi}",
             f"-dMonoImageResolution={dpi}",
-            # Force JPEG compression for color/gray images
+            # Force JPEG compression
             "-dAutoFilterColorImages=false",
             "-dAutoFilterGrayImages=false",
             "-dColorImageFilter=/DCTEncode",
             "-dGrayImageFilter=/DCTEncode",
-            # Set JPEG quality
-            f"-c '<< /ColorImageDict << /QFactor {(100 - img_quality) / 100:.2f} /Blend 1 /HSamples [2 1 1 2] /VSamples [2 1 1 2] >> >> setdistillerparams'",
-            f"-c '<< /GrayImageDict << /QFactor {(100 - img_quality) / 100:.2f} /Blend 1 /HSamples [2 1 1 2] /VSamples [2 1 1 2] >> >> setdistillerparams'",
-            # Strip metadata
+            # Optimize
             "-dDetectDuplicateImages=true",
             "-dCompressFonts=true",
             "-dSubsetFonts=true",
             f"-sOutputFile={tmp_out_path}",
+            # Load PS config for image quality, then process PDF
+            ps_config_path,
             tmp_in_path,
         ]
 
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
 
         if result.returncode != 0:
-            # Fallback: try simple compression without custom image settings
+            # Fallback: simpler command
             cmd_simple = [
                 GS_PATH,
                 "-sDEVICE=pdfwrite",
@@ -114,14 +103,11 @@ def compress_pdf(input_bytes: bytes, quality: str = "ebook") -> dict:
                 "-dDownsampleGrayImages=true",
                 f"-dColorImageResolution={dpi}",
                 f"-dGrayImageResolution={dpi}",
-                "-dDetectDuplicateImages=true",
                 "-dCompressFonts=true",
-                "-dSubsetFonts=true",
                 f"-sOutputFile={tmp_out_path}",
                 tmp_in_path,
             ]
             result = subprocess.run(cmd_simple, capture_output=True, text=True, timeout=120)
-
             if result.returncode != 0:
                 raise RuntimeError(f"Ghostscript error: {result.stderr}")
 
@@ -130,7 +116,6 @@ def compress_pdf(input_bytes: bytes, quality: str = "ebook") -> dict:
 
         compressed_size = len(compressed_bytes)
 
-        # If compression made it larger, return original
         if compressed_size >= original_size:
             return {
                 "buffer": input_bytes,
@@ -145,6 +130,6 @@ def compress_pdf(input_bytes: bytes, quality: str = "ebook") -> dict:
         }
 
     finally:
-        for path in [tmp_in_path, tmp_out_path]:
+        for path in [tmp_in_path, tmp_out_path, ps_config_path]:
             if os.path.exists(path):
                 os.unlink(path)

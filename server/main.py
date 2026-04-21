@@ -41,6 +41,12 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/api/config")
+def config():
+    max_mb = int(os.getenv("MAX_UPLOAD_MB", "100"))
+    return {"max_upload_bytes": max_mb * 1024 * 1024, "max_upload_mb": max_mb}
+
+
 # Serve React static files in production
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "static")
 if os.path.isdir(STATIC_DIR):

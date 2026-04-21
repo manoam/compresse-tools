@@ -127,3 +127,14 @@ export async function fetchHistoryUsers(token: string): Promise<HistoryUser[]> {
   if (!res.ok) return [];
   return res.json();
 }
+
+export interface AppConfig {
+  max_upload_bytes: number;
+  max_upload_mb: number;
+}
+
+export async function fetchConfig(): Promise<AppConfig> {
+  const res = await fetch('/api/config');
+  if (!res.ok) throw new Error('Failed to load config');
+  return res.json();
+}

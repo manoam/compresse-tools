@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import DropZone from '../components/DropZone';
 import CompressionResult from '../components/CompressionResult';
 import { useCompression } from '../hooks/useCompression';
+import { useMaxUpload } from '../hooks/useMaxUpload';
 import { compressImage } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -133,6 +134,7 @@ export default function CompressImage() {
   const [useCase, setUseCase] = useState<UseCaseId>('web');
   const [customQuality, setCustomQuality] = useState(60);
   const [customMaxWidth, setCustomMaxWidth] = useState(0);
+  const maxMb = useMaxUpload();
 
   const selectedUseCase = USE_CASES.find(u => u.id === useCase)!;
   const quality = useCase === 'custom' ? customQuality : selectedUseCase.quality;
@@ -166,7 +168,9 @@ export default function CompressImage() {
           </svg>
         </div>
         <h1 className="text-3xl font-bold text-gray-900">Compresser Image</h1>
-        <p className="text-gray-600 mt-2">JPG, PNG, WebP</p>
+        <p className="text-gray-600 mt-2">
+          JPG, PNG, WebP{maxMb !== null && ` — jusqu'à ${maxMb} MB`}
+        </p>
       </div>
 
       {!file && !result && (

@@ -3,6 +3,7 @@ import DropZone from '../components/DropZone';
 import FilePreview from '../components/FilePreview';
 import CompressionResult from '../components/CompressionResult';
 import { useCompression } from '../hooks/useCompression';
+import { useMaxUpload } from '../hooks/useMaxUpload';
 import { compressPdf } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -36,6 +37,7 @@ export default function CompressPdf() {
   const { token } = useAuth();
   const [preset, setPreset] = useState<PresetId>('ebook');
   const quality = PRESETS.find(p => p.id === preset)!.quality;
+  const maxMb = useMaxUpload();
   const { file, setFile, compressing, result, error, compress, download, reset } =
     useCompression({ compressFn: compressPdf, token });
 
@@ -50,7 +52,9 @@ export default function CompressPdf() {
           </svg>
         </div>
         <h1 className="text-3xl font-bold text-gray-900">Compresser PDF</h1>
-        <p className="text-gray-600 mt-2">Réduisez la taille de vos PDF</p>
+        <p className="text-gray-600 mt-2">
+          Réduisez la taille de vos PDF{maxMb !== null && ` — jusqu'à ${maxMb} MB`}
+        </p>
       </div>
 
       {!file && !result && (

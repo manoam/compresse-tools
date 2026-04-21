@@ -50,7 +50,7 @@ export default function CompressPdf() {
           </svg>
         </div>
         <h1 className="text-3xl font-bold text-gray-900">Compresser PDF</h1>
-        <p className="text-gray-600 mt-2">Réduisez la taille de vos PDF - jusqu'à 50 MB</p>
+        <p className="text-gray-600 mt-2">Réduisez la taille de vos PDF</p>
       </div>
 
       {!file && !result && (
